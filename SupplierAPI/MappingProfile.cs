@@ -23,10 +23,6 @@ public class MappingProfile : Profile
                 dest => dest.CNPJ,
                 opt => opt.MapFrom(src => FormatHelper.FormatCnpj(src.CNPJ))
             )
-            .ForMember(
-                dest => dest.EntityStatus,
-                opt => opt.MapFrom(src => src.EntityStatus.ToString())
-            )
             .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
     }
 }

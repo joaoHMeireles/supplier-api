@@ -27,24 +27,17 @@ public abstract class BaseRepository<T>(SupplierApiContext dbContext)
         return dbEntity.Entity;
     }
 
-    public async Task<List<T>> GetAllAsync()
+    public Task<List<T>> GetAllAsync()
     {
-        return await DBQuery
+        return DBQuery
             .Where(x => x.EntityStatus == EntityStatus.Active)
             .OrderBy(x => x.CreatedAt)
-            .ToListAsync()
-            .ConfigureAwait(false);
+            .ToListAsync();
     }
 
-    public async Task<T?> GetByIdAsync(int id, bool getDeleted = false)
+    public Task<T?> GetByIdAsync(int id)
     {
-        return await DBQuery
-            .Where(x => x.Id == id && (
-                x.EntityStatus == EntityStatus.Active 
-                || getDeleted
-            ))
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
+        return GetByIdAsync(id, false);
     }
 
     public async Task<T> UpdateAsync(T entity)
@@ -57,28 +50,48 @@ public abstract class BaseRepository<T>(SupplierApiContext dbContext)
         return entity;
     }
 
-    public async Task<bool> DeleteAsync(int id)
+    public async Task<OperationResult> DeleteAsync(int id)
     {
-        var dbEntity = await GetByIdAsync(id).ConfigureAwait(false);
+        var dbEntity = await GetByIdAsync(id, true).ConfigureAwait(false);
+        if (dbEntity == null) return OperationResult.NotFound;
+        if (dbEntity.EntityStatus == EntityStatus.Deleted) return OperationResult.NotPossible;
 
-        if (dbEntity == null) return false;
+        dbEntity.EntityStatus = EntityStatus.Deleted;
+        await UpdateAsync(dbEntity).ConfigureAwait(false);
 
-        await DeleteEntity(dbEntity, false).ConfigureAwait(false);
-
-        return true;
+        return OperationResult.Successfull;
     }
 
-    protected async Task DeleteEntity(T entity, bool fullDelete)
+    public async Task<OperationResult> RestoreEntity(int id)
     {
-        if (fullDelete)
-        {
-            SettedDB.Remove(entity);
-            await SaveChanges().ConfigureAwait(false);
-        }
-        else
-        {
-            entity.EntityStatus = EntityStatus.Deleted;
-            await UpdateAsync(entity).ConfigureAwait(false);
-        }
+        var entity = await GetByIdAsync(id, true).ConfigureAwait(false);
+        if(entity == null ) return OperationResult.NotFound;
+        if(entity.EntityStatus == EntityStatus.Active) return OperationResult.NotPossible;
+
+        entity.EntityStatus = EntityStatus.Active;
+        await UpdateAsync(entity).ConfigureAwait(false);
+
+        return OperationResult.Successfull;
+    } 
+
+    public async Task PurgeDeletedEntities()
+    {
+        var deletedEntities = await DBQuery
+            .Where(x => x.EntityStatus == EntityStatus.Deleted)
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        SettedDB.RemoveRange(deletedEntities);
+        await SaveChanges().ConfigureAwait(false);
+    }
+
+    protected Task<T?> GetByIdAsync(int id, bool getDeleted = false)
+    {
+        return DBQuery
+            .Where(x => x.Id == id && (
+                x.EntityStatus == EntityStatus.Active 
+                || getDeleted
+            ))
+            .FirstOrDefaultAsync();
     }
 }

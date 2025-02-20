@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using SupplierAPI.Data;
 using SupplierAPI.Models.Entities;
 using SupplierAPI.Repositories.BaseRepositories;
