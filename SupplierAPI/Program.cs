@@ -1,7 +1,6 @@
-using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using SupplierAPI;
-using SupplierAPI.Models.Database;
+using SupplierAPI.Data;
 using SupplierAPI.Repositories;
 using SupplierAPI.Repositories.Interfaces;
 using SupplierAPI.Services;
@@ -17,18 +16,12 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddDbContext<SupplierApiContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
-
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
 builder.Services.AddScoped<ISupplierService, SupplierService>();
 
-var mapperConfig = new MapperConfiguration(mc =>
-{
-    mc.AddProfile(new MappingProfile());
-});
-
-builder.Services.AddSingleton(mapperConfig.CreateMapper());
+builder.Services.AddAutoMapper(typeof(MappingProfile));
 
 var app = builder.Build();
 
@@ -40,6 +33,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseAuthorization();
 
 // app.UseRouting();
 

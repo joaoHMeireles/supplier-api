@@ -1,6 +1,7 @@
+using SupplierAPI.Models.Entities;
+
 namespace SupplierAPI.Repositories.Interfaces;
 
-public interface ISupplierRepository : IBaseRepository<Models.Supplier> 
+public interface ISupplierRepository : IBaseRepository<Supplier> 
 {
-    Task<Models.Supplier?> GetByCNPJAsyncAsNoTracking(string cnpj);
 }

@@ -1,19 +1,21 @@
 using Microsoft.EntityFrameworkCore;
-using SupplierAPI.Enums;
-using SupplierAPI.Models.BaseModels;
+using SupplierAPI.Data;
+using SupplierAPI.Models.Entities.BaseModels;
+using SupplierAPI.Models.Enums;
 using SupplierAPI.Repositories.Interfaces;
 
 namespace SupplierAPI.Repositories.BaseRepositories;
 
-public abstract class BaseRepository<T>(DbContext dbContext) : IBaseRepository<T> where T : BaseEntity
+public abstract class BaseRepository<T>(SupplierApiContext dbContext) 
+    : IBaseRepository<T> where T : BaseEntity
 {
-    protected DbContext DBContext { get; set; } = dbContext;
+    protected SupplierApiContext DBContext { get; set; } = dbContext;
     protected DbSet<T> SettedDB => DBContext.Set<T>();
-    protected IQueryable<T> DBQuery => SettedDB.AsNoTracking().Where(x => x.EntityStatus == EntityStatus.Active);
+    protected IQueryable<T> DBQuery => SettedDB.AsNoTracking();
 
     protected async Task SaveChanges() => await DBContext.SaveChangesAsync();
 
-    public async Task<int> AddAsync(T entity)
+    public async Task<T> AddAsync(T entity)
     {
         entity.CreatedAt = DateTime.UtcNow;
         entity.UpdatedAt = DateTime.UtcNow;
@@ -22,34 +24,38 @@ public abstract class BaseRepository<T>(DbContext dbContext) : IBaseRepository<T
         var dbEntity = await SettedDB.AddAsync(entity).ConfigureAwait(false);
         await SaveChanges().ConfigureAwait(false);
 
-        return dbEntity.Entity.Id;
+        return dbEntity.Entity;
     }
 
     public async Task<List<T>> GetAllAsync()
     {
         return await DBQuery
+            .Where(x => x.EntityStatus == EntityStatus.Active)
+            .OrderBy(x => x.CreatedAt)
             .ToListAsync()
             .ConfigureAwait(false);
     }
 
-    public async Task<T?> GetByIdAsync(int id)
+    public async Task<T?> GetByIdAsync(int id, bool getDeleted = false)
     {
         return await DBQuery
-            .Where(x => x.Id == id)
+            .Where(x => x.Id == id && (
+                x.EntityStatus == EntityStatus.Active 
+                || getDeleted
+            ))
             .FirstOrDefaultAsync()
             .ConfigureAwait(false);
     }
 
-    // public async Task<T> UpdateAsync(T entity)
-    // {
-    // entity.UpdatedAt = DateTime.UtcNow;
-    // // Update
-    // Console.WriteLine("Updating the blog and adding a post");
-    // blog.Url = "https://devblogs.microsoft.com/dotnet";
-    // blog.Posts.Add(
-    //     new Post { Title = "Hello World", Content = "I wrote an app using EF Core!" });
-    // await db.SaveChangesAsync();
-    // }
+    public async Task<T> UpdateAsync(T entity)
+    {
+        entity.UpdatedAt = DateTime.UtcNow;
+        DBContext.Entry(entity).State = EntityState.Modified;
+
+        await SaveChanges().ConfigureAwait(false);
+
+        return entity;
+    }
 
     public async Task<bool> DeleteAsync(int id)
     {
@@ -57,22 +63,22 @@ public abstract class BaseRepository<T>(DbContext dbContext) : IBaseRepository<T
 
         if (dbEntity == null) return false;
 
-        DeleteEntity(dbEntity, false);
-
-        await SaveChanges().ConfigureAwait(false);
+        await DeleteEntity(dbEntity, false).ConfigureAwait(false);
 
         return true;
     }
 
-    protected void DeleteEntity(T entity, bool fullDelete)
+    protected async Task DeleteEntity(T entity, bool fullDelete)
     {
         if (fullDelete)
         {
             SettedDB.Remove(entity);
+            await SaveChanges().ConfigureAwait(false);
         }
         else
         {
             entity.EntityStatus = EntityStatus.Deleted;
+            await UpdateAsync(entity).ConfigureAwait(false);
         }
     }
 }

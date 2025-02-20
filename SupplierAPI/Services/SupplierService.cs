@@ -1,7 +1,6 @@
 using AutoMapper;
-using SupplierAPI.DTOs;
-using SupplierAPI.Exceptions;
-using SupplierAPI.Models;
+using SupplierAPI.Models.DTOs;
+using SupplierAPI.Models.Entities;
 using SupplierAPI.Repositories.Interfaces;
 using SupplierAPI.Services.Interfaces;
 
@@ -18,33 +17,35 @@ public class SupplierService(
         var suppliers = await supplierRepository.GetAllAsync().ConfigureAwait(false);
         return mapper.Map<List<SupplierOutputDto>>(suppliers);
     }
-    
-    public async Task<SupplierOutputDto> GetSupplierById(int id)
+
+    public async Task<SupplierOutputDto?> GetSupplierById(int id)
     {
-        var supplier = await supplierRepository.GetByIdAsync(id).ConfigureAwait(false) 
-            ?? throw new EntityNotFoundException();
+        var supplier = await supplierRepository.GetByIdAsync(id, true).ConfigureAwait(false);
         return FromEntityToOutput(supplier);
     }
 
-    public async Task<int> AddSupplier(SupplierInputDto supplierInput)
+    public async Task<SupplierOutputDto?> AddSupplier(SupplierInputDto supplierInput)
     {
         var newSupplier = FromInputToEntity(supplierInput);
-        return await supplierRepository.AddAsync(newSupplier).ConfigureAwait(false);
+        var supplier = await supplierRepository.AddAsync(newSupplier).ConfigureAwait(false);
+        return FromEntityToOutput(supplier);
     }
 
-    public async Task<SupplierOutputDto> UpdateSupplier(SupplierInputDto supplierInput)
+    public async Task<SupplierOutputDto?> UpdateSupplier(int id, SupplierInputDto supplierInput)
     {
-        // var supplier = FromInputToEntity(supplierInput);
-        // var updatedSupplier = await supplierRepository.UpdateAsync(supplier).ConfigureAwait(false);
-        // return FromEntityToOutput(updatedSupplier);
-        return null;
-    }
-    
-    public async Task DeleteSupplier(int id)
-    {
-        var successfullyDeleted = await supplierRepository.DeleteAsync(id).ConfigureAwait(false);
+        var dbSupplier = await supplierRepository.GetByIdAsync(id).ConfigureAwait(false);
+        if(dbSupplier == null) return null;
 
-        if(!successfullyDeleted) throw new EntityNotFoundException();
+        var supplier = FromInputToEntity(dbSupplier, supplierInput);
+        supplier.Id = id;
+
+        var updatedSupplier = await supplierRepository.UpdateAsync(supplier).ConfigureAwait(false);
+        return FromEntityToOutput(updatedSupplier);
+    }
+
+    public async Task<bool> DeleteSupplier(int id)
+    {
+        return await supplierRepository.DeleteAsync(id).ConfigureAwait(false);
     }
 
     private Supplier FromInputToEntity(SupplierInputDto supplierInput)
@@ -52,8 +53,13 @@ public class SupplierService(
         return mapper.Map<Supplier>(supplierInput);
     }
 
-    private SupplierOutputDto FromEntityToOutput(Supplier supplier)
+    private Supplier FromInputToEntity(Supplier dbSupplier, SupplierInputDto supplierInput)
     {
-        return mapper.Map<SupplierOutputDto>(supplier);;
+        return mapper.Map(supplierInput, dbSupplier);
+    }
+
+    private SupplierOutputDto? FromEntityToOutput(Supplier? supplier)
+    {
+        return supplier == null ? null : mapper.Map<SupplierOutputDto>(supplier);
     }
 }

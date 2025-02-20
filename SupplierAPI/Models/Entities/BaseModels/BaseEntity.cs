@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
-using SupplierAPI.Enums;
+using SupplierAPI.Models.Enums;
 
-namespace SupplierAPI.Models.BaseModels;
+namespace SupplierAPI.Models.Entities.BaseModels;
 
 public abstract class BaseEntity
 {

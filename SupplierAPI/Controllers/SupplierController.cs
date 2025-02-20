@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using SupplierAPI.Controllers.BaseControllers;
-using SupplierAPI.DTOs;
+using SupplierAPI.Models.DTOs;
 using SupplierAPI.Services.Interfaces;
 
 namespace SupplierAPI.Controllers;
@@ -25,19 +25,26 @@ public class SupplierController(ISupplierService supplierService)
     [HttpGet("{id}")]
     public override async Task<ActionResult<SupplierOutputDto>> GetById(int? id)
     {
-        CheckId(id);
-
-        return Ok(await supplierService.GetSupplierById(id.Value).ConfigureAwait(false));
+        if (!TryGetIdValue(id, out int idValue)) return BadRequest("Provided id is invalid");
+        
+        var supplier = await supplierService.GetSupplierById(idValue).ConfigureAwait(false);
+        if (supplier == null)  return NotFound($"Supplier with id {id} not found");
+            
+        return Ok(supplier);
     }
 
     /// <summary> Create a new supplier with the info passed on the Body </summary>
     /// <params> A SupplierInputDto with all the needed information</params>
-    /// <returns> An id to the created supplier </returns>
+    /// <returns> An SupplierOutputDto with the newlly added Supplier info </returns>
     [HttpPost]
     public override async Task<ActionResult<int>> Add([FromBody] SupplierInputDto input)
     {
-        var newSupplierId = await supplierService.AddSupplier(input).ConfigureAwait(false);
-        return Ok(newSupplierId);
+        if (input == null) return BadRequest("Missing supplier information");
+        
+        var newSupplier = await supplierService.AddSupplier(input).ConfigureAwait(false);
+        if (newSupplier == null)  return NotFound($"An error occured while creating the Supplier");
+
+        return Ok(newSupplier);
     }
 
     /// <summary> Update a supplier with the info passed on the Body </summary>
@@ -46,24 +53,25 @@ public class SupplierController(ISupplierService supplierService)
     [HttpPut("{id}")]
     public override async Task<ActionResult<SupplierOutputDto>> Update(int? id, [FromBody] SupplierInputDto input)
     {
-        CheckId(id);
-
-        var updatedSupplier = await supplierService.UpdateSupplier(input).ConfigureAwait(false);
+        if (!TryGetIdValue(id, out int idValue)) return BadRequest("Provided id is invalid");
+        if (input == null) return BadRequest("Missing supplier information");
+        
+        var updatedSupplier = await supplierService.UpdateSupplier(idValue, input).ConfigureAwait(false);
+        if (updatedSupplier == null)  return NotFound($"Supplier with id {id} not found");
 
         return Ok(updatedSupplier);
     }
 
-
     /// <summary> Delete a supplier with the given id </summary>
     /// <params> The supplier id to be deleted </params>
-    /// 
     [HttpDelete("{id}")]
     public override async Task<ActionResult> Delete(int? id)
     {
-        CheckId(id);
+        if (!TryGetIdValue(id, out int idValue)) return BadRequest("Provided id is invalid");
+        
+        var successfullOperation = await supplierService.DeleteSupplier(idValue).ConfigureAwait(false);
+        if (!successfullOperation)  return NotFound($"Supplier with id {id} not found");
 
-        await supplierService.DeleteSupplier(id.Value).ConfigureAwait(false);
-
-        return Ok();
+        return Ok($"Supplier with id {id} was successfully deleted");
     }
 }
